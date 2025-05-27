@@ -39,7 +39,13 @@
                 for (const page of data.chapter.data) {
                     const imageUrl = corsProxy + encodeURIComponent(`https://uploads.mangadex.org/data/${data.chapter.hash}/${page}`);
                     console.log('Fetching image:', imageUrl);
-                    const img = await fetch(imageUrl).then(res => res.blob());
+                    const img = await fetch(imageUrl, {
+                        method: 'GET',
+                        headers: {/*it must think it is opened from the browser*/
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+                            
+                        }
+                    }).then(res => res.blob());
 
                     const imgElement = document.createElement('img');
                     imgElement.src = URL.createObjectURL(img);
