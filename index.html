@@ -8,6 +8,7 @@
     <input id="url-input" placeholder="https://mangadex.org/chapter/xxxxxxx" size="50"/>
     <button id="download-btn">Download PDF</button>
     <p id="status"></p>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/3.0.1/jspdf.umd.min.js"></script>
     <script>
         const downloadBtn = document.getElementById('download-btn');
         const urlInput = document.getElementById('url-input');
@@ -17,7 +18,6 @@
 
         downloadBtn.addEventListener('click', async () => {
             const url = urlInput.value.trim();
-            console.log('URL:', url);
             const match = url.match(chapterIdRegex);
             if (!match) {
                 statusText.textContent = 'Invalid URL';
@@ -26,33 +26,25 @@
             const chapterId = match[1];
             statusText.textContent = 'Fetching chapter data...';
             try {
-                const response = await fetch(apiChapterUrl + chapterId);
+                // Use a CORS proxy for the API call
+                const corsProxy = 'https://corsproxy.io/?url=';
+                console.log(corsProxy + encodeURIComponent(apiChapterUrl + chapterId))
+                const response = await fetch(corsProxy + encodeURIComponent(apiChapterUrl + chapterId));
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
                 const data = await response.json();
-                const baseUrl = data.baseUrl;
-                const chapterData = data.chapter;
-                const pages = chapterData.data.map(page => `${baseUrl}/data/${chapterId}/${page}`);
-                
-                // Create a PDF document
-                const pdfDoc = await PDFLib.PDFDocument.create();
-                for (const pageUrl of pages) {
-                    const imgBytes = await fetch(pageUrl).then(res => res.arrayBuffer());
-                    const img = await pdfDoc.embedPng(imgBytes);
-                    const page = pdfDoc.addPage([img.width, img.height]);
-                    page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+                console.log(data);
+
+                for (const page of data.chapter.data) {
+                    const imageUrl = corsProxy + encodeURIComponent(`https://uploads.mangadex.org/data/${data.chapter.hash}/${page}`);
+                    console.log('Fetching image:', imageUrl);
+                    const img = await fetch(imageUrl).then(res => res.blob());
+
+                    const imgElement = document.createElement('img');
+                    imgElement.src = URL.createObjectURL(img);
+                    document.body.appendChild(imgElement);
                 }
-                
-                // Save the PDF
-                const pdfBytes = await pdfDoc.save();
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `chapter-${chapterId}.pdf`;
-                link.click();
-                
-                statusText.textContent = 'Download complete!';
             } catch (error) {
                 console.error('Error:', error);
                 statusText.textContent = 'Error fetching chapter data.';
