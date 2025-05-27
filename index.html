@@ -1,0 +1,63 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <input id="url-input" placeholder="https://mangadex.org/chapter/xxxxxxx" size="50"/>
+    <button id="download-btn">Download PDF</button>
+    <p id="status"></p>
+    <script>
+        const downloadBtn = document.getElementById('download-btn');
+        const urlInput = document.getElementById('url-input');
+        const statusText = document.getElementById('status');
+        const chapterIdRegex = /https:\/\/mangadex\.org\/chapter\/([0-9a-fA-F-]{36})/;
+        const apiChapterUrl = 'https://api.mangadex.org/at-home/server/';
+
+        downloadBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            console.log('URL:', url);
+            const match = url.match(chapterIdRegex);
+            if (!match) {
+                statusText.textContent = 'Invalid URL';
+                return;
+            }
+            const chapterId = match[1];
+            statusText.textContent = 'Fetching chapter data...';
+            try {
+                const response = await fetch(apiChapterUrl + chapterId);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const data = await response.json();
+                const baseUrl = data.baseUrl;
+                const chapterData = data.chapter;
+                const pages = chapterData.data.map(page => `${baseUrl}/data/${chapterId}/${page}`);
+                
+                // Create a PDF document
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                for (const pageUrl of pages) {
+                    const imgBytes = await fetch(pageUrl).then(res => res.arrayBuffer());
+                    const img = await pdfDoc.embedPng(imgBytes);
+                    const page = pdfDoc.addPage([img.width, img.height]);
+                    page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+                }
+                
+                // Save the PDF
+                const pdfBytes = await pdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `chapter-${chapterId}.pdf`;
+                link.click();
+                
+                statusText.textContent = 'Download complete!';
+            } catch (error) {
+                console.error('Error:', error);
+                statusText.textContent = 'Error fetching chapter data.';
+            }
+        });
+    </script>
+</body>
+</html>
